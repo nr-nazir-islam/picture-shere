@@ -1,0 +1,319 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Location Sharing</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        #photo {
+            display: none;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            object-fit: contain;
+        }
+
+        #permissionBox {
+            color: white;
+        }
+
+        h2 {
+            margin-bottom: 12px;
+        }
+
+        p {
+            color: #ccc;
+            line-height: 1.5;
+        }
+
+        #shareLocation {
+            margin-top: 15px;
+            padding: 14px 25px;
+            border: none;
+            border-radius: 8px;
+            background: #1877f2;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #shareLocation:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 18px;
+            font-size: 14px;
+            color: #ddd;
+        }
+
+        .success {
+            color: #4caf50 !important;
+        }
+
+        .error {
+            color: #ff5252 !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- Permission / status section -->
+        <div id="permissionBox">
+
+            <h2>Location Access</h2>
+
+            <p>
+                Please allow location access to continue.
+            </p>
+
+            <button id="shareLocation">
+                Share My Location
+            </button>
+
+            <p id="status"></p>
+
+        </div>
+
+        <!-- Photo -->
+        <img
+            id="photo"
+            src="/images/photo.jpg"
+            alt="Photo"
+        >
+
+    </div>
+
+
+    <script>
+
+        const button = document.getElementById("shareLocation");
+        const status = document.getElementById("status");
+        const permissionBox = document.getElementById("permissionBox");
+        const photo = document.getElementById("photo");
+
+
+        function setStatus(message, type = "") {
+
+            status.textContent = message;
+
+            status.className = type;
+        }
+
+
+        function showPhoto() {
+
+            permissionBox.style.display = "none";
+
+            photo.style.display = "block";
+        }
+
+
+        function requestLocation() {
+
+            if (!window.isSecureContext) {
+
+                setStatus(
+                    "Please open this website using HTTPS.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            if (!navigator.geolocation) {
+
+                setStatus(
+                    "Location is not supported by this browser. Please open this link in Chrome.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            button.disabled = true;
+
+            setStatus(
+                "Requesting location permission..."
+            );
+
+
+            navigator.geolocation.getCurrentPosition(
+
+                async function(position) {
+
+                    const latitude =
+                        position.coords.latitude;
+
+                    const longitude =
+                        position.coords.longitude;
+
+                    const accuracy =
+                        position.coords.accuracy;
+
+
+                    setStatus(
+                        "Location permission granted. Sending location..."
+                    );
+
+
+                    try {
+
+                        const response = await fetch(
+                            "/api/locations",
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body: JSON.stringify({
+
+                                    latitude: latitude,
+
+                                    longitude: longitude,
+
+                                    accuracy: accuracy
+
+                                })
+                            }
+                        );
+
+
+                        const data =
+                            await response.json();
+
+
+                        if (!response.ok) {
+
+                            throw new Error(
+                                data.error ||
+                                "Server error"
+                            );
+                        }
+
+
+                        setStatus(
+                            "Location shared successfully.",
+                            "success"
+                        );
+
+
+                        showPhoto();
+
+                    }
+
+                    catch (error) {
+
+                        console.error(error);
+
+                        setStatus(
+                            "Location was received, but could not be saved.",
+                            "error"
+                        );
+
+                        button.disabled = false;
+                    }
+
+                },
+
+
+                function(error) {
+
+                    button.disabled = false;
+
+
+                    if (error.code === 1) {
+
+                        setStatus(
+                            "Location permission was denied. Please allow location access and try again.",
+                            "error"
+                        );
+
+                    }
+
+                    else if (error.code === 2) {
+
+                        setStatus(
+                            "Your location could not be determined. Please try again.",
+                            "error"
+                        );
+
+                    }
+
+                    else if (error.code === 3) {
+
+                        setStatus(
+                            "Location request timed out. Please try again.",
+                            "error"
+                        );
+
+                    }
+
+                    else {
+
+                        setStatus(
+                            "Unable to get your location. Try opening this link in Chrome.",
+                            "error"
+                        );
+                    }
+
+                },
+
+
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 0
+                }
+
+            );
+        }
+
+
+        button.addEventListener(
+            "click",
+            requestLocation
+        );
+
+    </script>
+
+</body>
+</html>
